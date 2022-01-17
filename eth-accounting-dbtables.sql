@@ -11,6 +11,9 @@ CREATE TABLE ETH_TRANSFERS (
     gasCostInWei           VARCHAR(100)
 );
 
+CREATE INDEX ETH_TRANSFERS_I01 ON ETH_TRANSFERS(fromAddress, timestamp);
+CREATE INDEX ETH_TRANSFERS_I02 ON ETH_TRANSFERS(toAddress, timestamp);
+
 CREATE TABLE ETH_ACCOUNTING_SYNC (
     address                VARCHAR(100) PRIMARY KEY,
     blockNum               VARCHAR(40)
