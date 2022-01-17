@@ -28,6 +28,8 @@ const pool = mariadb.createPool(config.get('db'));
 const transfers_table = config.get('dbtables.transfers');
 const sync_table = config.get('dbtables.sync');
 
+var txCount = 0;
+
 /**
  * @dev The main execution point of the script.
  *
@@ -55,14 +57,14 @@ async function main() {
 
     const toBlock = await web3.eth.getBlockNumber();
     const toBlockHex = toHex(toBlock).toString();
-    console.log(toBlock)
+    console.log("Processing the history up to block " + toBlock);
 
     const accountsAndLastFetchedBlocks = await getLastFetchedBlockForAccounts(accounts);
     const data = await processAccounts(
         accountsAndLastFetchedBlocks,
         toBlockHex
     );
-    console.log(JSON.stringify(data))
+    console.log("Retrieved " + txCount + " transactions");
     try {
         // store all transfer data in database.
         await populateDatabase(data);
@@ -232,7 +234,8 @@ function processTransfers(
                 || category === INTERNAL
                 || category === TOKEN
             ) {
-                console.log("TxHash: ", txHash);
+                //console.log("TxHash: ", txHash);
+                txCount++;
 
                 const transferData = {
                     txHash,
