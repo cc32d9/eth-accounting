@@ -1,5 +1,5 @@
 {
-  "name": "scanner",
+  "name": "eth-accounting",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "dotenv": "^10.0.0",
+    "config": ">=3.3.3",
     "mariadb": "^2.5.5",
     "web3": "^1.6.0"
   }

@@ -1,9 +1,8 @@
+const config  = require('config');
 const mariadb = require("mariadb");
 const Web3 = require("web3");
-const dotenv = require("dotenv");
 
-dotenv.config();
-const web3 = new Web3(process.env.RPC_URL);
+const web3 = new Web3(config.get('rpc_url'));
 
 const big = web3.utils.toBN;
 const toHex = web3.utils.toHex;
@@ -19,28 +18,15 @@ const ASSET_MOVEMENT = ["In", "Out"];
 // Constants to differentiate between type of assets.
 const ASSET_TYPES = ["ETH", "ERC20"];
 
-/**
- * @dev Retrieves environment variable related to database connection.
- */
-const {
-    MARIADB_HOST,
-    MARIADB_USER,
-    MARIADB_PASSWORD,
-    MARIADB_DATABASE,
-    MARIADB_CONNECTION_LIMIT,
-} = process.env;
 
 /**
  * @dev Establishes connection with database.
  *
  */
-const pool = mariadb.createPool({
-    host: MARIADB_HOST,
-    user: MARIADB_USER,
-    password: MARIADB_PASSWORD,
-    database: MARIADB_DATABASE,
-    connectionLimit: MARIADB_CONNECTION_LIMIT
-});
+const pool = mariadb.createPool(config.get('db'));
+
+const transfers_table = config.get('dbtables.transfers');
+const sync_table = config.get('dbtables.sync');
 
 /**
  * @dev The main execution point of the script.
@@ -52,16 +38,16 @@ const pool = mariadb.createPool({
  * till the {latest} block.
  *
  * The retrieved transfers against list of addresses are stored in
- * {Transfer} table in the database. The block that the balances are
- * fetched till is stored in {UserSyncedBlock} table against the
+ * {transfers_table} table in the database. The block that the balances are
+ * fetched till is stored in {sync_table} table against the
  * account.
  */
 async function main() {
-    const accounts = process.argv.slice(2);
+    const accounts = config.get('accounts');
     accounts.forEach(
         (account) => {
             if (!web3.utils.isAddress(account)) {
-                console.error("Invalid Address provided");
+                console.error("Invalid ETH Address: " + account);
                 process.exit(1);
             }
         }
@@ -334,7 +320,7 @@ async function updateLatestFetchedBlockForAccounts(
 ) {
     const conn = await pool.getConnection();
     await conn.batch(
-        "REPLACE INTO UserSyncedBlock (" +
+        "REPLACE INTO " + sync_table + " (" +
         "address," +
         " blockNum" +
         ")" +
@@ -358,7 +344,7 @@ async function getLastFetchedBlockForAccounts(accounts) {
             account
         ) => {
             const blockNum = await conn.query(
-                "SELECT blockNum from UserSyncedBlock where 'address' = " +
+                "SELECT blockNum from " + sync_table + " where 'address' = " +
                 account.toLowerCase()
             );
             acc = await acc;
@@ -445,7 +431,7 @@ async function populateDatabase(data) {
             account,
         ) => {
             await conn.batch(
-                "INSERT INTO Transfer (" +
+                "INSERT INTO " + transfers_table + " (" +
                 "txHash," +
                 " fromAddress," +
                 " toAddress," +
