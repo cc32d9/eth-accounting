@@ -113,17 +113,26 @@ async function processAccounts(
                                 let uuid = DEFAULT_UUID;
                                 let processedTransfersFrom = {};
                                 while (uuid) {
-                                    const {
-                                        result: {
-                                            transfers: transfersFrom,
-                                            pageKey
+                                    let transfersFrom;
+                                    let pageKey;
+
+                                    while (!transfersFrom) {
+                                        const response = await fetchTransfers({
+                                            fromBlock: accountsAndLastFetchedBlocks[account],
+                                            toBlock,
+                                            fromAddress: account,
+                                            uuid,
+                                        });
+
+                                        if (response.result) {
+                                            ({
+                                                result: {
+                                                    transfers: transfersFrom,
+                                                    pageKey
+                                                }
+                                            } = response);
                                         }
-                                    } = await fetchTransfers({
-                                        fromBlock: accountsAndLastFetchedBlocks[account],
-                                        toBlock,
-                                        fromAddress: account,
-                                        uuid,
-                                    });
+                                    }
 
                                     uuid = pageKey;
                                     processedTransfersFrom = {
@@ -138,17 +147,26 @@ async function processAccounts(
                             let uuid = DEFAULT_UUID;
                             let processedTransfersTo = {};
                             while (uuid) {
-                                const {
-                                    result: {
-                                        transfers: transfersTo,
-                                        pageKey,
+                                let transfersTo;
+                                let pageKey;
+
+                                while (!transfersTo) {
+                                    const response = await fetchTransfers({
+                                        fromBlock: accountsAndLastFetchedBlocks[account],
+                                        toBlock,
+                                        toAddress: account,
+                                        uuid,
+                                    });
+
+                                    if (response.result) {
+                                        ({
+                                            result: {
+                                                transfers: transfersTo,
+                                                    pageKey,
+                                            }
+                                        } = response);
                                     }
-                                } = await fetchTransfers({
-                                    fromBlock: accountsAndLastFetchedBlocks[account],
-                                    toBlock,
-                                    toAddress: account,
-                                    uuid,
-                                });
+                                }
 
                                 uuid = pageKey;
                                 processedTransfersTo = {
@@ -325,7 +343,8 @@ async function updateLatestFetchedBlockForAccounts(
         " blockNum" +
         ")" +
         " VALUES (?, ?)",
-        accounts.map(account => [account, lastFetchedBlockNum])
+        accounts.map(
+            account => [account.toLowerCase(), lastFetchedBlockNum])
     );
     await conn.commit();
     await conn.release();
@@ -344,14 +363,14 @@ async function getLastFetchedBlockForAccounts(accounts) {
             account
         ) => {
             const blockNum = await conn.query(
-                "SELECT blockNum from " + sync_table + " where 'address' = " +
-                account.toLowerCase()
+                "SELECT blockNum from " + sync_table + " where address = "
+                + `'${account.toLowerCase()}'`
             );
             acc = await acc;
             return {
                 ...acc,
                 [account]: toHex(
-                    blockNum.length ? blockNum : 0
+                    blockNum.length ? blockNum[0].blockNum : 0
                 ).toString(),
             }
         }, Promise.resolve({})
@@ -430,23 +449,26 @@ async function populateDatabase(data) {
             acc,
             account,
         ) => {
-            await conn.batch(
-                "INSERT INTO " + transfers_table + " (" +
-                "txHash," +
-                " fromAddress," +
-                " toAddress," +
-                " assetName," +
-                " value," +
-                " contractAddress," +
-                " assetDecimal," +
-                " blockNum," +
-                " timestamp," +
-                " gasCostInWei" +
-                ") " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                aggregateData(data[account])
-            );
-            await conn.commit();
+            const aggregatedData = aggregateData(data[account]);
+            if (aggregatedData.length) {
+                await conn.batch(
+                    "INSERT INTO " + transfers_table + " (" +
+                    "txHash," +
+                    " fromAddress," +
+                    " toAddress," +
+                    " assetName," +
+                    " value," +
+                    " contractAddress," +
+                    " assetDecimal," +
+                    " blockNum," +
+                    " timestamp," +
+                    " gasCostInWei" +
+                    ") " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    aggregatedData
+                );
+                await conn.commit();
+            }
             await acc;
         }, Promise.resolve()
     );
@@ -457,3 +479,4 @@ async function populateDatabase(data) {
  * @dev Starts the script.
  */
 main();
+
